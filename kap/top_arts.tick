@@ -1,0 +1,12 @@
+stream
+	|from()
+		.measurement('pageview')
+	|groupBy('site', 'section', 'url')
+	|window()
+		.period(15s)
+		.every(15s)
+		.align()
+	|sum('duration')
+	|influxDBOut()
+		.database('alan_raw_hits')
+		.measurement('popularity')
