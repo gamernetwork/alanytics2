@@ -37,9 +37,23 @@ def init(argv):
 
 def init_db():
     global db
-    db = InfluxDBClient('localhost', 8086, 'root', 'root', 'alan_raw_hits')
-    db.create_database('alan_raw_hits',if_not_exists=True)
-    db.create_retention_policy('oneday', '1d', 1, database='alan_raw_hits', default=True)
+    db = InfluxDBClient('localhost', 8086, 'root', 'root')
+    db.create_database('alan',if_not_exists=True)
+    db.switch_database('alan')
+    db.create_retention_policy('raw_hits', '1h', 1, database='alan', default=True)
+    db.create_retention_policy('workingset', '1h', 1, database='alan', default=False)
+    db.create_retention_policy('digest', '1d', 1, database='alan', default=False)
+    db.create_retention_policy('trends', '1w', 1, database='alan', default=False)
+    db.create_retention_policy('historical', '52w', 1, database='alan', default=False)
+
+    # downsample data into counts per 5 for all articles
+    # keep for a 1h
+    db.query( "DROP CONTINUOUS QUERY pageview_5s_count ON alan" );
+    db.query( "CREATE CONTINUOUS QUERY pageview_5s_count ON alan BEGIN SELECT count(\"duration\") INTO alan.workingset.pageview_5s_bins FROM alan.raw_hits.pageview GROUP BY site, section, url, time(5s) END" );
+    # work out pages/sec for all content, updated per minute
+    # keep for a day
+    db.query( "DROP CONTINUOUS QUERY create_pageview_rate ON alan" );
+    db.query( "CREATE CONTINUOUS QUERY create_pageview_rate ON alan BEGIN SELECT sum(\"count\")/60 INTO alan.digest.pageview_rate FROM alan.workingset.pageview_5s_bins GROUP BY site, section, url, time(1m) END" );
     
     return db
 

@@ -1,12 +1,28 @@
-stream
+var popularity = stream
 	|from()
 		.measurement('pageview')
-	|groupBy('site', 'section', 'url')
+		.groupBy('site', 'section', 'url')
 	|window()
-		.period(15s)
-		.every(15s)
+		.period(5s)
+		.every(5s)
 		.align()
 	|sum('duration')
+	
+popularity
 	|influxDBOut()
 		.database('alan_raw_hits')
 		.measurement('popularity')
+
+popularity
+	@pyavg()
+		.field('sum')
+		.size(3)
+		.as('buzz')
+	|top(50, 'buzz', 'site', 'section', 'url' )
+	|httpOut('buzz')
+
+popularity
+	|groupBy('site', 'section', 'url')
+//	|last('sum')
+	|top(50, 'sum', 'site', 'section', 'url' )
+	|httpOut('top50')

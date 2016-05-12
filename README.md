@@ -69,12 +69,15 @@ env/bin/pip install -r requirements.txt
 
 Run collector
 
+```
 env/bin/python -m aiohttp.web -H `hostname` -P 8081 alan.app:init
+```
 
 Define Kapacitor pipeline
 
+```
 kapacitor define -name top_arts -tick top_arts.tick -type stream -dbrp alan_raw_hits.oneday
 kapacitor enable top_arts
-
+```
 
 
