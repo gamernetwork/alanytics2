@@ -1,0 +1,29 @@
+var all_articles = batch
+	|from()
+		.measurement('pageview')
+	|window()
+		.period(5s)
+		.every(5s)
+		.align()
+
+var articles = all_articles
+	|groupBy('site', 'section', 'url')
+	|count('duration')
+		.as('pageviews')
+
+var baseline = all_articles
+	|count('duration')
+		.as('site_pageviews')
+
+var top = baseline
+	|join(baseline)
+		.as('pageviews', 'site_pageviews')
+		.tolerance(5s)
+		.fill(0)
+
+articles
+	|httpOut('articles')
+baseline
+	|httpOut('baseline')
+top
+	|httpOut('top')

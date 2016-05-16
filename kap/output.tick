@@ -1,0 +1,10 @@
+stream
+	|from()
+		.database('alan')
+		.measurement('activity')
+		.retentionPolicy('workingset')
+	|window()
+		.period(2m)
+		.every(1m)
+	|top(10, 'activity')
+	|httpOut('activity')

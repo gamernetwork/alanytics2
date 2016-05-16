@@ -1,0 +1,20 @@
+var bins = stream
+	|from()
+		.measurement('pageview')
+	|window()
+		.period(5s)
+		.every(5s)
+		.align()
+	|groupBy('site', 'section', 'url')
+	|count('duration')
+		.as('pageviews')
+
+var buzz = bins
+	|window()
+		.period(1m)
+		.every(5s)
+	|sum('pageviews')
+		.as('pageviews')
+
+buzz
+	|httpOut('buzz')

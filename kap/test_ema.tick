@@ -1,0 +1,10 @@
+var bins = batch
+	|query('select * from alan.digest.pageview_rate')
+		.every(1m)
+		.period(10m)
+		.groupBy('site', 'section', 'url')
+	|eval(lambda:'now()' - 'time')
+		.as('age')
+
+bins
+	|httpOut('bins')

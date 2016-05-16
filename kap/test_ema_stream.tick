@@ -1,0 +1,17 @@
+var bins = stream
+	|from()
+		.database('alan')
+		.measurement('pageview_rate')
+		.retentionPolicy('digest')
+	|groupBy('site', 'section', 'url')
+	@pyema()
+		.field('views_per_second')
+		.alpha(0.1)
+		.as('activity')
+
+bins
+	|influxDBOut()
+		.database('alan')
+		.measurement('activity')
+		.retentionPolicy('workingset')
+
