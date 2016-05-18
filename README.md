@@ -1,3 +1,5 @@
+Want to work for Gamer Network? [We are hiring!](http://www.gamesindustry.biz/jobs/gamer-network)
+
 # Alanytics 2
 
 Real time data for editorial sites. A rewrite of https://github.com/gamernetwork/alanytics (node and cronjob based analysis).
