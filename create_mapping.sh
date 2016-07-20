@@ -7,7 +7,15 @@ curl -XPUT 'http://localhost:9200/alanytics-pageview/_mapping/pageview' -d '
         "type":     "string",
         "index":    "not_analyzed"
     },
-    "url": {
+    "platforms": {
+        "type":     "string",
+        "index":    "not_analyzed"
+    },
+    "platforms_raw": {
+        "type":     "string",
+        "index":    "not_analyzed"
+    },
+    "referrer": {
         "type":     "string",
         "index":    "not_analyzed"
     },
@@ -16,9 +24,13 @@ curl -XPUT 'http://localhost:9200/alanytics-pageview/_mapping/pageview' -d '
         "index":    "not_analyzed"
     },
     "site": {
-        "type":     "string"
+        "type":     "string",
+        "index":    "not_analyzed"
     },
     "timestamp": {
+        "type":     "date"
+    },
+    "published": {
         "type":     "date"
     }
   }
