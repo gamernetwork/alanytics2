@@ -1,4 +1,5 @@
 import re
+from pprint import pprint
 
 from datetime import datetime
 from collections import OrderedDict
@@ -80,7 +81,7 @@ class Analytics(object):
                   "gauss": {
                     "published": {
                       "origin": "now",
-                      "scale": "30m",
+                      "scale": "3h",
                       "decay": 0.9,
                     },
                   },
