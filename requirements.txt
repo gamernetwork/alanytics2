@@ -1,5 +1,6 @@
 aiohttp==0.21.6
 elasticsearch==2.3.0
+aioes
 python-dateutil==2.5.3
 pytz==2016.4
 requests==2.10.0

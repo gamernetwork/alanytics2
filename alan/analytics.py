@@ -4,46 +4,55 @@ from pprint import pprint
 from datetime import datetime
 from collections import OrderedDict
 
-from elasticsearch import Elasticsearch
+#from elasticsearch import Elasticsearch
+from aioes import Elasticsearch
 
 class Analytics(object):
     
     def __init__(self):
         #TODO: make ES connection details configurable
-        self.es = Elasticsearch()
+        self.es = Elasticsearch(['localhost:9200'])
 
-    def register(self, site, path, section, referrer, published, platforms=None):
+    async def register(self, site, path, section, referrer, published, platforms=None, timestamp=None):
+        if not timestamp:
+            timestamp = datetime.now()
         pageview = {
             "site": site,
             "full_url": site + path,
             "section": section,
             "referrer": referrer,
-            "timestamp": datetime.now(),
-            "published": published,
+            "timestamp": self._build_es_datetime(timestamp),
+            "published": self._build_es_datetime(published),
         }
         if platforms:
             pageview['platforms'] = platforms
             pageview['platforms_raw'] = [platform.replace(' ', '').lower() for platform in platforms]
-        self.es.index(index="alanytics-pageview", doc_type="pageview", 
+        await self.es.index(index="alanytics-pageview", doc_type="pageview", 
             body=pageview)
 
-    def _resolve_period(self, period):
+    def _resolve_period(self, period, timestamp=None):
+        origin = 'now'
+        if timestamp:
+            origin = self._build_es_datetime(timestamp) + '||'
         if period == 'last_hour':
-            return ('now-1h', 60)
+            return ('%s-1h' % origin, 60)
         if period == 'last_minute':
-            return ('now-1m', 1)
+            return ('%s-1m' % origin, 1)
         minutes_regex = "^last_([0-9]+)_minutes$"
         minutes_match = re.match(minutes_regex, period)
         if minutes_match:
             minutes = minutes_match.group(1)
-            return ("now-%sm" % minutes, int(minutes))
+            return ("%s-%sm" % (origin, minutes), int(minutes))
 
-    def _get_filters(self, period, section=None, site=None, referrer=None):
+    def _get_filters(self, period, timestamp=None, section=None, site=None, referrer=None):
+        if not timestamp:
+            timestamp = "now"
         filters = [
             {
               "range": {                                                             
                 "timestamp": {                                                       
-                    "gt": period
+                    "gt": period,
+                    "lte": timestamp
                 }
               }
             }
@@ -62,26 +71,32 @@ class Analytics(object):
             platform_filter.append({'term': {'platforms_raw': platform}})
         return platform_filter
 
-    def _build_aggregate_query(self, must_filters, aggregates, should_query=[]):
+    def _build_es_datetime(self, timestamp):
+        return datetime.strftime(timestamp, "%Y-%m-%dT%H:%M:%S")
+
+    def _build_aggregate_query(self, must_filters, aggregates, should_query=[], timestamp=None):
+        origin = 'now'
+        if timestamp:
+            origin = self._build_es_datetime(timestamp)
         query = {
           "size": 0,                                                                    
           "query": {
             "function_score": {
               "functions": [
                 {
-                  "gauss": {
+                  "exp": {
                     "timestamp": {
-                      "origin": "now",
+                      "origin": origin,
                       "scale": "5m",
                       "decay": 0.9,
                     },
                   },
                 },
                 {
-                  "gauss": {
+                  "exp": {
                     "published": {
-                      "origin": "now",
-                      "scale": "3h",
+                      "origin": origin,
+                      "scale": "0.5d",
                       "decay": 0.9,
                     },
                   },
@@ -106,29 +121,31 @@ class Analytics(object):
         }
         return query
 
-    def get_top_articles(self, period, site=None, referrer=None, platforms=[], size=10):
-        es_period, minutes = self._resolve_period(period)
-        filters = self._get_filters(es_period, section="article", site=site, referrer=referrer)
+    async def get_top_articles(self, period, site=None, referrer=None, platforms=[], size=10, timestamp=None):
+        es_period, minutes = self._resolve_period(period, timestamp)
+        timestamp_str = self._build_es_datetime(timestamp)
+        filters = self._get_filters(es_period, timestamp=timestamp_str, section="article", site=site, referrer=referrer)
         platform_query = self._get_platform_query(platforms=platforms)
-        shard_size = size * 10
+        shard_size = size * 2
         aggregates = {                                                                     
           "group_by_url": {                                                   
             "terms": {                                                                
               "field": "full_url",                                                    
               "order" : { "article_score" : "desc" },
               "size": size,
-              "shard_size": shard_size
+              "shard_size": shard_size,
             },
             "aggs": {
               "article_score": {"sum": {"script": "_score"}},
+              "published": {"terms": {"field": "published"}},
             }
           },
         }        
-        query = self._build_aggregate_query(filters, aggregates, should_query=platform_query)
-        result = self.es.search(index="alanytics-pageview", body=query)
+        query = self._build_aggregate_query(filters, aggregates, should_query=platform_query, timestamp=timestamp)
+        result = await self.es.search(index="alanytics-pageview", body=query)
         print("get_top_articles took %s" % result['took'])
         buckets = result['aggregations']['group_by_url']['buckets'][:10]
-        all_counts = [(bucket['key'], bucket['article_score']['value']) for bucket in buckets]
+        all_counts = [(("(%s) " + bucket['key']) % bucket['published']['buckets'][0]['key_as_string'], bucket['article_score']['value']) for bucket in buckets]
         return OrderedDict(all_counts)
 
 analytics = Analytics()
