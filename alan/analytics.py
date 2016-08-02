@@ -12,6 +12,13 @@ class Analytics(object):
     def __init__(self):
         #TODO: make ES connection details configurable
         self.es = Elasticsearch(['localhost:9200'])
+        self.pageview_index = 'analytics-pageview-2016-07-27'
+        #self.query_index = self.pageview_index
+        self.query_index = []
+        #for i in range(11, 19):
+        #    self.query_index.append("analytics-pageview-v2-2016-07-%s" % i)
+        for i in range(11, 19):
+            self.query_index.append("analytics-pageview-filtered-2016-07-%s" % i)
 
     async def register(self, site, path, section, referrer, published, platforms=None, timestamp=None):
         if not timestamp:
@@ -27,7 +34,7 @@ class Analytics(object):
         if platforms:
             pageview['platforms'] = platforms
             pageview['platforms_raw'] = [platform.replace(' ', '').lower() for platform in platforms]
-        await self.es.index(index="alanytics-pageview", doc_type="pageview", 
+        await self.es.index(index=self.pageview_index, doc_type="pageview", 
             body=pageview)
 
     def _resolve_period(self, period, timestamp=None):
@@ -96,7 +103,7 @@ class Analytics(object):
                   "exp": {
                     "published": {
                       "origin": origin,
-                      "scale": "0.5d",
+                      "scale": "0.25d",
                       "decay": 0.9,
                     },
                   },
@@ -136,16 +143,37 @@ class Analytics(object):
               "shard_size": shard_size,
             },
             "aggs": {
-              "article_score": {"sum": {"script": "_score"}},
+              "article_score": {"sum": {"script": "_score", "lang": "expression"}},
               "published": {"terms": {"field": "published"}},
             }
           },
         }        
+        #aggregates = {                                                                     
+        #  "sample": {                                                   
+        #    "sampler": {                                                                
+        #      "field": "full_url",                                                    
+        #      "max_docs_per_value": 100000,
+        #      "shard_size": 1000,
+        #    },
+        #    "aggs": {
+        #        "group_by_url": {                                                   
+        #          "terms": {                                                                
+        #            "field": "full_url",                                                    
+        #            "order" : { "article_score" : "desc" },
+        #          },
+        #          "aggs": {
+        #            "article_score": {"sum": {"script": "_score"}},
+        #          }
+        #        }
+        #    }
+        #  },
+        #}        
         query = self._build_aggregate_query(filters, aggregates, should_query=platform_query, timestamp=timestamp)
-        result = await self.es.search(index="alanytics-pageview", body=query)
+        result = await self.es.search(index=self.query_index, body=query)
         print("get_top_articles took %s" % result['took'])
         buckets = result['aggregations']['group_by_url']['buckets'][:10]
         all_counts = [(("(%s) " + bucket['key']) % bucket['published']['buckets'][0]['key_as_string'], bucket['article_score']['value']) for bucket in buckets]
+        #all_counts = [(bucket['key'], bucket['article_score']['value']) for bucket in buckets]
         return OrderedDict(all_counts)
 
 analytics = Analytics()

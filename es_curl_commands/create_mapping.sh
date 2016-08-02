@@ -1,6 +1,12 @@
-curl -XPUT 'http://localhost:9200/alanytics-pageview/' -d '{}'
+curl -XPUT 'http://localhost:9200/alanytics-pageview-meaty/' -d '
+{
+	"settings" : {
+        "number_of_shards" : 50,
+        "number_of_replicas" : 1
+    }
+}'
 
-curl -XPUT 'http://localhost:9200/alanytics-pageview/_mapping/pageview' -d '
+curl -XPUT 'http://localhost:9200/alanytics-pageview-meaty/_mapping/pageview' -d '
 {
   "properties": {
     "section": {
